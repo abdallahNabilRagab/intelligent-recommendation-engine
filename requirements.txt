@@ -1,0 +1,26 @@
+# Data handling
+pandas
+numpy
+
+# Machine Learning / Feature Engineering
+scikit-learn
+scipy
+altair==4.2.0
+
+# Recommender Systems
+implicit
+faiss-cpu   
+
+# Utilities
+tqdm
+joblib
+
+# Visualization 
+matplotlib
+seaborn
+
+# Web / UI
+streamlit
+
+# Text processing (ـ content-based tags)
+nltk
