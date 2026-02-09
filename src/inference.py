@@ -12,6 +12,7 @@ import pandas as pd
 from scipy import sparse
 from pathlib import Path
 import logging
+import io
 
 from src.als.recommend import ALSRecommender
 from src.content_based.search import ContentSearcher
@@ -222,4 +223,5 @@ class RecommenderEngine:
 
     def recommend_hybrid(self, user_id, top_k=10, alpha=0.7):
         return self._format_output(self.hybrid_engine.recommend_weighted(user_id, top_k, alpha))
+
 
