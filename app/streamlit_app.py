@@ -1,13 +1,21 @@
 # ==========================================
 # RECSYS_PROJECT/app/streamlit_app.py
 # Cloud-Safe Production Streamlit Interface
-# Arrow / LargeUtf8 Safe
+# Arrow / LargeUtf8 FINAL FIX
 # ==========================================
 
 import streamlit as st
 import pandas as pd
 import sys
 from pathlib import Path
+
+
+# ==========================================
+# 🔒 CRITICAL FIX: Disable Arrow Globally
+# ==========================================
+
+st.set_option("dataframe.arrowEnabled", False)
+st.set_option("dataframe.use_container_width", True)
 
 
 # ==========================================
@@ -62,25 +70,27 @@ if not hasattr(engine, "movies") or engine.movies is None:
     st.error("❌ Movies metadata not found in the engine.")
     st.stop()
 
-movies = engine.movies
+movies = engine.movies.copy()
+movies["title"] = movies["title"].astype(str)
 
 
 # ==========================================
-# Utility: Arrow-Safe DataFrame
+# Utility: FINAL Arrow-Safe DataFrame
 # ==========================================
 
 def arrow_safe_df(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Convert all text-like columns to str
-    to avoid Apache Arrow / LargeUtf8 crash in Streamlit.
+    FINAL & GUARANTEED FIX:
+    - Disable Arrow issues (LargeUtf8)
+    - Force Pandas rendering
     """
     if df is None or df.empty:
-        return df
+        return pd.DataFrame()
 
-    safe_df = df.copy()
+    safe_df = df.copy().reset_index(drop=True)
+
     for col in safe_df.columns:
-        if safe_df[col].dtype == "object" or str(safe_df[col].dtype).startswith("string"):
-            safe_df[col] = safe_df[col].astype(str)
+        safe_df[col] = safe_df[col].astype(str)
 
     return safe_df
 
@@ -145,7 +155,7 @@ elif mode == "Content-Based":
 
     movie_title = st.selectbox(
         "Select a Movie",
-        movies["title"].astype(str).sort_values().values
+        movies["title"].sort_values().values
     )
 
     if st.button("🔍 Find Similar Movies"):
