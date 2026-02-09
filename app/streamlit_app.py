@@ -1,6 +1,7 @@
 # ==========================================
 # RECSYS_PROJECT/app/streamlit_app.py
 # Cloud-Safe Production Streamlit Interface
+# Arrow / LargeUtf8 Safe
 # ==========================================
 
 import streamlit as st
@@ -14,7 +15,6 @@ from pathlib import Path
 # ==========================================
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -66,6 +66,26 @@ movies = engine.movies
 
 
 # ==========================================
+# Utility: Arrow-Safe DataFrame
+# ==========================================
+
+def arrow_safe_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Convert all text-like columns to str
+    to avoid Apache Arrow / LargeUtf8 crash in Streamlit.
+    """
+    if df is None or df.empty:
+        return df
+
+    safe_df = df.copy()
+    for col in safe_df.columns:
+        if safe_df[col].dtype == "object" or str(safe_df[col].dtype).startswith("string"):
+            safe_df[col] = safe_df[col].astype(str)
+
+    return safe_df
+
+
+# ==========================================
 # UI Header
 # ==========================================
 
@@ -111,7 +131,10 @@ if mode == "ALS (User-Based)":
             recs = engine.recommend_als(user_id)
 
         st.subheader("📌 Recommended Movies")
-        st.dataframe(recs, use_container_width=True)
+        st.dataframe(
+            arrow_safe_df(recs),
+            use_container_width=True
+        )
 
 
 # ==========================================
@@ -122,7 +145,7 @@ elif mode == "Content-Based":
 
     movie_title = st.selectbox(
         "Select a Movie",
-        movies["title"].sort_values().values
+        movies["title"].astype(str).sort_values().values
     )
 
     if st.button("🔍 Find Similar Movies"):
@@ -136,7 +159,10 @@ elif mode == "Content-Based":
             recs = engine.recommend_content(movie_id)
 
         st.subheader("📌 Similar Movies")
-        st.dataframe(recs, use_container_width=True)
+        st.dataframe(
+            arrow_safe_df(recs),
+            use_container_width=True
+        )
 
 
 # ==========================================
@@ -157,7 +183,10 @@ elif mode == "Hybrid":
             recs = engine.recommend_hybrid(user_id)
 
         st.subheader("📌 Hybrid Recommendations")
-        st.dataframe(recs, use_container_width=True)
+        st.dataframe(
+            arrow_safe_df(recs),
+            use_container_width=True
+        )
 
 
 # ==========================================
