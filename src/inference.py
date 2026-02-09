@@ -12,7 +12,6 @@ import pandas as pd
 from scipy import sparse
 from pathlib import Path
 import logging
-import io
 
 from src.als.recommend import ALSRecommender
 from src.content_based.search import ContentSearcher
@@ -74,9 +73,17 @@ def sanitize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         df_copy[col] = df_copy[col].astype(str)
     return df_copy
 
+def truncate_strings(df: pd.DataFrame, max_len: int = 100) -> pd.DataFrame:
+    """Truncate string columns to avoid LargeUtf8 issues in Streamlit"""
+    df_copy = df.copy()
+    for col in df_copy.select_dtypes(include=['object', 'string']).columns:
+        df_copy[col] = df_copy[col].astype(str).str.slice(0, max_len)
+    return df_copy
+
 def safe_read_parquet(path: Path) -> pd.DataFrame:
     df = pd.read_parquet(path)
-    return sanitize_dataframe(df)
+    df = sanitize_dataframe(df)
+    return df
 
 # ==========================================
 # NPZ Loader
@@ -190,27 +197,20 @@ class RecommenderEngine:
             train_df=train_df
         )
 
+    # --------------------------------------
+    # Output Formatter
+    # --------------------------------------
     def _format_output(self, recs):
         if recs is None or len(recs) == 0:
             return pd.DataFrame()
-        
-        # اجعل movieId من كلا الجدولين str
-        recs_df = pd.DataFrame(recs, columns=["movieId", "score"])
-        recs_df["movieId"] = recs_df["movieId"].astype(str)
+        df_recs = pd.DataFrame(recs, columns=["movieId", "score"])
+        df_recs["movieId"] = df_recs["movieId"].astype(str)
         self.movies["movieId"] = self.movies["movieId"].astype(str)
-        
-        df = recs_df.merge(self.movies, on="movieId", how="left")
-        
-        # اجعل كل الأعمدة str لضمان عدم ظهور LargeUtf8
-        for col in df.columns:
-            df[col] = df[col].astype(str)
-        
-        # إعادة القراءة من CSV في الذاكرة قبل العرض
-        buffer = io.StringIO()
-        df.to_csv(buffer, index=False)
-        buffer.seek(0)
-        return pd.read_csv(buffer)
-
+        df = df_recs.merge(self.movies, on="movieId", how="left")
+        df = sanitize_dataframe(df)
+        # Truncate long strings to avoid LargeUtf8 in Streamlit
+        df = truncate_strings(df, max_len=100)
+        return df
 
     # --------------------------------------
     # APIs
@@ -223,5 +223,3 @@ class RecommenderEngine:
 
     def recommend_hybrid(self, user_id, top_k=10, alpha=0.7):
         return self._format_output(self.hybrid_engine.recommend_weighted(user_id, top_k, alpha))
-
-
