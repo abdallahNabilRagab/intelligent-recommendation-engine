@@ -8,6 +8,7 @@ import streamlit as st
 import pandas as pd
 import sys
 from pathlib import Path
+import io
 
 
 # ==========================================
@@ -70,21 +71,26 @@ movies["title"] = movies["title"].astype(str)
 # FINAL Arrow-Safe DataFrame Utility
 # ==========================================
 
-def arrow_safe_df(df: pd.DataFrame) -> pd.DataFrame:
+def safe_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """
     FINAL & GUARANTEED FIX:
-    - Avoid Arrow / LargeUtf8 issues
-    - Force safe Pandas rendering
+    - Avoid Arrow / LargeUtf8 issues in Streamlit
+    - Convert all columns to str
+    - Re-read via CSV in-memory to bypass Arrow
     """
     if df is None or df.empty:
         return pd.DataFrame()
 
-    safe_df = df.copy().reset_index(drop=True)
+    # Convert all columns to string
+    df_copy = df.copy().reset_index(drop=True)
+    for col in df_copy.columns:
+        df_copy[col] = df_copy[col].astype(str)
 
-    for col in safe_df.columns:
-        safe_df[col] = safe_df[col].astype(str)
-
-    return safe_df
+    # Write to CSV buffer and read back (Arrow-free)
+    buffer = io.StringIO()
+    df_copy.to_csv(buffer, index=False)
+    buffer.seek(0)
+    return pd.read_csv(buffer)
 
 
 # ==========================================
@@ -101,7 +107,6 @@ st.caption("Academic • Production-Grade • Research-Oriented")
 
 with st.sidebar:
     st.header("⚙️ Recommendation Settings")
-
     mode = st.selectbox(
         "Recommender Type",
         ["ALS (User-Based)", "Content-Based", "Hybrid"]
@@ -128,13 +133,12 @@ if mode == "ALS (User-Based)":
     )
 
     if st.button("🎯 Get Recommendations"):
-
         with st.spinner("Generating recommendations..."):
             recs = engine.recommend_als(user_id)
 
         st.subheader("📌 Recommended Movies")
         st.dataframe(
-            arrow_safe_df(recs),
+            safe_dataframe(recs),
             use_container_width=True
         )
 
@@ -151,7 +155,6 @@ elif mode == "Content-Based":
     )
 
     if st.button("🔍 Find Similar Movies"):
-
         movie_id = movies.loc[
             movies["title"] == movie_title,
             "movieId"
@@ -162,7 +165,7 @@ elif mode == "Content-Based":
 
         st.subheader("📌 Similar Movies")
         st.dataframe(
-            arrow_safe_df(recs),
+            safe_dataframe(recs),
             use_container_width=True
         )
 
@@ -180,13 +183,12 @@ elif mode == "Hybrid":
     )
 
     if st.button("🤝 Generate Hybrid Recommendations"):
-
         with st.spinner("Running hybrid inference..."):
             recs = engine.recommend_hybrid(user_id)
 
         st.subheader("📌 Hybrid Recommendations")
         st.dataframe(
-            arrow_safe_df(recs),
+            safe_dataframe(recs),
             use_container_width=True
         )
 
@@ -198,9 +200,7 @@ elif mode == "Hybrid":
 st.markdown("---")
 
 with st.container():
-
     st.markdown("## 👨‍💻 Developer Information")
-
     col1, col2 = st.columns([1, 3])
 
     with col1:
