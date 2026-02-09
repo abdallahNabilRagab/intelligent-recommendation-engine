@@ -52,8 +52,11 @@ if not hasattr(engine, "movies") or engine.movies is None:
     st.error("❌ Movies metadata not found in the engine.")
     st.stop()
 
+# Copy and sanitize movies for safe Streamlit display
 movies = engine.movies.copy()
+movies = movies.astype(str)  # Ensure all columns are strings
 movies["title"] = movies["title"].astype(str)
+movies["movieId"] = movies["movieId"].astype(str)
 
 # ==========================================
 # Arrow/LargeUtf8 SAFE DataFrame Utility
@@ -70,8 +73,7 @@ def safe_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
     
     df_copy = df.copy().reset_index(drop=True)
-    for col in df_copy.columns:
-        df_copy[col] = df_copy[col].astype(str)
+    df_copy = df_copy.astype(str)
     
     buffer = io.StringIO()
     df_copy.to_csv(buffer, index=False)
@@ -99,9 +101,9 @@ with st.sidebar:
 # ==========================================
 st.markdown("### 🎯 Recommendation Interface")
 
-# ==========================================
+# ------------------------------------------
 # ALS Mode
-# ==========================================
+# ------------------------------------------
 if mode == "ALS (User-Based)":
     user_id = st.number_input("Enter User ID", min_value=1, step=1)
     if st.button("🎯 Get Recommendations"):
@@ -110,9 +112,9 @@ if mode == "ALS (User-Based)":
         st.subheader("📌 Recommended Movies")
         st.dataframe(safe_dataframe(recs), use_container_width=True)
 
-# ==========================================
+# ------------------------------------------
 # Content-Based Mode
-# ==========================================
+# ------------------------------------------
 elif mode == "Content-Based":
     movie_title = st.selectbox("Select a Movie", movies["title"].sort_values().values)
     if st.button("🔍 Find Similar Movies"):
@@ -122,9 +124,9 @@ elif mode == "Content-Based":
         st.subheader("📌 Similar Movies")
         st.dataframe(safe_dataframe(recs), use_container_width=True)
 
-# ==========================================
+# ------------------------------------------
 # Hybrid Mode
-# ==========================================
+# ------------------------------------------
 elif mode == "Hybrid":
     user_id = st.number_input("Enter User ID", min_value=1, step=1)
     if st.button("🤝 Generate Hybrid Recommendations"):
