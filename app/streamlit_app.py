@@ -1,14 +1,13 @@
 # ==========================================
 # RECSYS_PROJECT/app/streamlit_app.py
 # Cloud-Safe Production Streamlit Interface
-# Arrow / LargeUtf8 FINAL & GUARANTEED FIX
+# Arrow / LargeUtf8 FULLY SAFE – Cloud Stable Edition
 # ==========================================
 
 import streamlit as st
 import pandas as pd
 import sys
 from pathlib import Path
-import io
 
 # ==========================================
 # Page Configuration
@@ -54,31 +53,27 @@ if not hasattr(engine, "movies") or engine.movies is None:
 
 # Copy and sanitize movies for safe Streamlit display
 movies = engine.movies.copy()
-movies = movies.astype(str)  # Ensure all columns are strings
+movies = movies.astype(str)
 movies["title"] = movies["title"].astype(str)
 movies["movieId"] = movies["movieId"].astype(str)
 
 # ==========================================
-# Arrow/LargeUtf8 SAFE DataFrame Utility
+# Arrow / LargeUtf8 SAFE DataFrame Utility
 # ==========================================
-def safe_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+def safe_dataframe_for_streamlit(df: pd.DataFrame, max_len: int = 100) -> pd.DataFrame:
     """
-    GUARANTEED Arrow / LargeUtf8 fix for Streamlit
-    Steps:
-    1. Convert all columns to string
-    2. Export to in-memory CSV
-    3. Read back CSV to avoid Arrow rendering issues
+    ضمان عمل Streamlit DataFrame بدون أخطاء LargeUtf8:
+    1. تحويل جميع الأعمدة إلى نصوص
+    2. تقليم النصوص الطويلة جداً
     """
     if df is None or df.empty:
         return pd.DataFrame()
-    
+
     df_copy = df.copy().reset_index(drop=True)
-    df_copy = df_copy.astype(str)
-    
-    buffer = io.StringIO()
-    df_copy.to_csv(buffer, index=False)
-    buffer.seek(0)
-    return pd.read_csv(buffer)
+    for col in df_copy.columns:
+        df_copy[col] = df_copy[col].astype(str)
+        df_copy[col] = df_copy[col].str.slice(0, max_len)  # trim long strings
+    return df_copy
 
 # ==========================================
 # UI Header
@@ -110,7 +105,7 @@ if mode == "ALS (User-Based)":
         with st.spinner("Generating recommendations..."):
             recs = engine.recommend_als(user_id)
         st.subheader("📌 Recommended Movies")
-        st.dataframe(safe_dataframe(recs), use_container_width=True)
+        st.dataframe(safe_dataframe_for_streamlit(recs), use_container_width=True)
 
 # ------------------------------------------
 # Content-Based Mode
@@ -122,7 +117,7 @@ elif mode == "Content-Based":
         with st.spinner("Finding similar movies..."):
             recs = engine.recommend_content(movie_id)
         st.subheader("📌 Similar Movies")
-        st.dataframe(safe_dataframe(recs), use_container_width=True)
+        st.dataframe(safe_dataframe_for_streamlit(recs), use_container_width=True)
 
 # ------------------------------------------
 # Hybrid Mode
@@ -133,7 +128,7 @@ elif mode == "Hybrid":
         with st.spinner("Running hybrid inference..."):
             recs = engine.recommend_hybrid(user_id)
         st.subheader("📌 Hybrid Recommendations")
-        st.dataframe(safe_dataframe(recs), use_container_width=True)
+        st.dataframe(safe_dataframe_for_streamlit(recs), use_container_width=True)
 
 # ==========================================
 # Footer / Developer Info
