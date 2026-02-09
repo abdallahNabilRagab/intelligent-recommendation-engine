@@ -1,26 +1,41 @@
-# Data handling
+# ================================
+# Core Data Handling
+# ================================
 pandas
 numpy
-
-# Machine Learning / Feature Engineering
-scikit-learn
 scipy
-altair==4.2.0
 
-# Recommender Systems
+# ================================
+# Machine Learning / Feature Engineering
+# ================================
+scikit-learn
 implicit
-faiss-cpu   
-
-# Utilities
-tqdm
 joblib
 
-# Visualization 
+# ================================
+# Recommender Systems / ANN Search
+# ================================
+faiss-cpu
+
+# ================================
+# Utilities
+# ================================
+tqdm
+gdown
+
+# ================================
+# Visualization
+# ================================
 matplotlib
 seaborn
+altair==4.2.0
 
+# ================================
 # Web / UI
+# ================================
 streamlit
 
-# Text processing (ـ content-based tags)
+# ================================
+# Text Processing (Content-Based)
+# ================================
 nltk
