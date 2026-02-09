@@ -67,7 +67,7 @@ def render_table_html(df: pd.DataFrame):
 
     df = df.copy().reset_index(drop=True)
 
-    # Force everything to string + HARD truncate
+    # Force string + truncate hard
     df = df.astype(str)
     for col in df.columns:
         df[col] = df[col].str.slice(0, 300)
@@ -75,32 +75,40 @@ def render_table_html(df: pd.DataFrame):
     html = df.to_html(
         index=False,
         escape=True,
-        classes="recsys-table"
+        border=0,
+        justify="left"
     )
 
     st.markdown(
         f"""
         <style>
-        .recsys-table {{
+        table.recsys-table {{
             width: 100%;
             border-collapse: collapse;
+            font-family: Arial, sans-serif;
             font-size: 14px;
         }}
-        .recsys-table th {{
-            background-color: #111;
+        table.recsys-table thead th {{
+            background-color: #0e1117;
             color: white;
-            padding: 8px;
+            padding: 10px;
+            border-bottom: 2px solid #444;
             text-align: left;
         }}
-        .recsys-table td {{
+        table.recsys-table tbody td {{
             padding: 8px;
-            border-bottom: 1px solid #444;
+            border-bottom: 1px solid #333;
+            vertical-align: top;
             white-space: normal;
             word-break: break-word;
             max-width: 420px;
         }}
+        table.recsys-table tbody tr:hover {{
+            background-color: #1f2937;
+        }}
         </style>
-        {html}
+
+        {html.replace('<table', '<table class="recsys-table"')}
         """,
         unsafe_allow_html=True
     )
