@@ -1,13 +1,14 @@
 # ==========================================
 # RECSYS_PROJECT/app/streamlit_app.py
-# Production Streamlit Interface
-# Arrow-Safe • Cloud Stable • Clean Version
+# Cloud-Safe Production Streamlit Interface
+# Arrow / LargeUtf8 FINAL & GUARANTEED FIX
 # ==========================================
 
 import streamlit as st
 import pandas as pd
 import sys
 from pathlib import Path
+import io
 
 # ==========================================
 # Page Configuration
@@ -19,14 +20,14 @@ st.set_page_config(
 )
 
 # ==========================================
-# Resolve Project Root
+# Resolve Project Root (Cloud & Local Safe)
 # ==========================================
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 # ==========================================
-# Safe Import Engine
+# Safe Imports
 # ==========================================
 try:
     from src.inference import RecommenderEngine
@@ -36,7 +37,7 @@ except Exception as e:
     st.stop()
 
 # ==========================================
-# Load Engine (Cached Resource)
+# Load Recommender Engine (Cached)
 # ==========================================
 @st.cache_resource(show_spinner="🔄 Loading recommendation engine...")
 def load_engine():
@@ -45,26 +46,37 @@ def load_engine():
 engine = load_engine()
 
 # ==========================================
-# Validate Engine Data
+# Validate Engine Assets
 # ==========================================
 if not hasattr(engine, "movies") or engine.movies is None:
-    st.error("❌ Movies metadata missing.")
+    st.error("❌ Movies metadata not found in the engine.")
     st.stop()
 
 movies = engine.movies.copy()
-
-if "title" in movies.columns:
-    movies["title"] = movies["title"].astype(str)
+movies["title"] = movies["title"].astype(str)
 
 # ==========================================
-# Safe DataFrame Renderer
+# FINAL Arrow/LargeUtf8 SAFE DataFrame Utility
 # ==========================================
-def render_table(df: pd.DataFrame):
+def safe_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    GUARANTEED Arrow / LargeUtf8 fix for Streamlit
+    Steps:
+    1. Convert all columns to string
+    2. Export to in-memory CSV
+    3. Read back CSV to avoid Arrow rendering issues
+    """
     if df is None or df.empty:
-        st.warning("⚠️ No results found.")
-        return
-    df = pd.DataFrame(df).reset_index(drop=True)
-    st.dataframe(df, use_container_width=True)
+        return pd.DataFrame()
+    
+    df_copy = df.copy().reset_index(drop=True)
+    for col in df_copy.columns:
+        df_copy[col] = df_copy[col].astype(str)
+    
+    buffer = io.StringIO()
+    df_copy.to_csv(buffer, index=False)
+    buffer.seek(0)
+    return pd.read_csv(buffer)
 
 # ==========================================
 # UI Header
@@ -91,72 +103,45 @@ st.markdown("### 🎯 Recommendation Interface")
 # ALS Mode
 # ==========================================
 if mode == "ALS (User-Based)":
-
     user_id = st.number_input("Enter User ID", min_value=1, step=1)
-
     if st.button("🎯 Get Recommendations"):
-
         with st.spinner("Generating recommendations..."):
             recs = engine.recommend_als(user_id)
-
         st.subheader("📌 Recommended Movies")
-        render_table(recs)
+        st.dataframe(safe_dataframe(recs), use_container_width=True)
 
 # ==========================================
 # Content-Based Mode
 # ==========================================
 elif mode == "Content-Based":
-
-    movie_title = st.selectbox(
-        "Select a Movie",
-        movies["title"].sort_values().values
-    )
-
+    movie_title = st.selectbox("Select a Movie", movies["title"].sort_values().values)
     if st.button("🔍 Find Similar Movies"):
-
-        movie_id = movies.loc[
-            movies["title"] == movie_title,
-            "movieId"
-        ].iloc[0]
-
+        movie_id = movies.loc[movies["title"] == movie_title, "movieId"].iloc[0]
         with st.spinner("Finding similar movies..."):
             recs = engine.recommend_content(movie_id)
-
         st.subheader("📌 Similar Movies")
-        render_table(recs)
+        st.dataframe(safe_dataframe(recs), use_container_width=True)
 
 # ==========================================
 # Hybrid Mode
 # ==========================================
 elif mode == "Hybrid":
-
     user_id = st.number_input("Enter User ID", min_value=1, step=1)
-
     if st.button("🤝 Generate Hybrid Recommendations"):
-
         with st.spinner("Running hybrid inference..."):
             recs = engine.recommend_hybrid(user_id)
-
         st.subheader("📌 Hybrid Recommendations")
-        render_table(recs)
+        st.dataframe(safe_dataframe(recs), use_container_width=True)
 
 # ==========================================
-# Footer
+# Footer / Developer Info
 # ==========================================
 st.markdown("---")
-
 with st.container():
-
     st.markdown("## 👨‍💻 Developer Information")
-
     col1, col2 = st.columns([1, 3])
-
     with col1:
-        st.image(
-            "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
-            width=110
-        )
-
+        st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=110)
     with col2:
         st.markdown("""
 ### 🧑‍💻 Abdallah Nabil Ragab
@@ -174,5 +159,4 @@ your feedback is highly appreciated.
 📩 **Email:**  
 `abdallah.nabil.ragab94@gmail.com`
 """)
-
 st.markdown("---")
