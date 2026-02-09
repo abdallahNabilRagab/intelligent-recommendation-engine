@@ -158,6 +158,8 @@ if mode == "ALS (User-Based)":
 # Content-Based Mode
 # ------------------------------------------
 elif mode == "Content-Based":
+    st.info("ℹ️ Content-Based recommendations do not require a User ID.")
+
     movie_title = st.selectbox(
         "Select a Movie",
         movies["title"].sort_values().unique()
