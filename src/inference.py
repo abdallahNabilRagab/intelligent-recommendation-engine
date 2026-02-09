@@ -1,7 +1,7 @@
 # ==========================================
 # RECSYS_PROJECT/src/inference.py
-# Robust Production Inference Engine
-# Arrow / LargeUtf8 SAFE – Cloud Stable Edition
+# Production Recommender Engine
+# Streamlit Cloud Stable • Arrow Proof • No LargeUtf8
 # ==========================================
 
 import pickle
@@ -25,10 +25,11 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",
 )
+
 logger = logging.getLogger(__name__)
 
 # ==========================================
-# Runtime Cache Directory
+# Runtime Cache
 # ==========================================
 
 CACHE_DIR = Path("/tmp/recsys_cache")
@@ -46,22 +47,15 @@ GDRIVE_FILES = {
 }
 
 # ==========================================
-# Helpers
+# Download Helper
 # ==========================================
 
-def _safe_remove(path: Path):
-    try:
-        if path.exists():
-            path.unlink()
-    except Exception:
-        pass
+def download_if_needed(filename: str, force: bool = False):
 
-
-def download_if_needed(filename: str, force: bool = False) -> Path:
     path = CACHE_DIR / filename
 
-    if force:
-        _safe_remove(path)
+    if force and path.exists():
+        path.unlink()
 
     if not path.exists():
         logger.info(f"⬇️ Downloading {filename}")
@@ -73,51 +67,51 @@ def download_if_needed(filename: str, force: bool = False) -> Path:
         )
 
     if not path.exists() or path.stat().st_size < 1024:
-        raise RuntimeError(f"❌ Invalid or empty file: {filename}")
+        raise RuntimeError(f"Invalid file: {filename}")
 
     return path
 
-
 # ==========================================
-# 🔥 Arrow / LargeUtf8 Killer
+# 🔥 HARD Arrow Killer
 # ==========================================
 
 def sanitize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
+
+    df = pd.DataFrame(df).copy()
 
     for col in df.columns:
-        dtype_name = str(df[col].dtype)
 
-        if dtype_name in ["string", "large_string"]:
-            df[col] = df[col].astype("object")
+        if "string" in str(df[col].dtype).lower():
+            df[col] = df[col].astype(str)
 
-        elif "string" in dtype_name.lower():
-            df[col] = df[col].astype("object")
+        elif str(df[col].dtype).startswith("large"):
+            df[col] = df[col].astype(str)
+
+        elif df[col].dtype == "object":
+            df[col] = df[col].astype(str)
+
+    df = df.convert_dtypes(dtype_backend="numpy_nullable")
 
     return df
 
 
-def safe_read_parquet(path: Path) -> pd.DataFrame:
+def safe_read_parquet(path: Path):
+
     df = pd.read_parquet(path)
+
     return sanitize_dataframe(df)
 
-
 # ==========================================
-# NPZ Loader
+# Numpy Loader
 # ==========================================
 
-def load_npz_as_npy_safe(path: Path) -> np.ndarray:
-    try:
-        with np.load(path) as data:
-            if "data" not in data:
-                raise ValueError("Missing 'data' key in NPZ")
+def load_npz_safe(path: Path):
+
+    with np.load(path) as data:
+        if "data" in data:
             return data["data"]
-    except Exception:
-        logger.warning(f"⚠️ Corrupted NPZ detected: {path.name} → retrying")
-        _safe_remove(path)
-        path = download_if_needed(path.name, force=True)
-        with np.load(path) as data:
-            return data["data"]
+
+    raise RuntimeError("Invalid NPZ format")
 
 # ==========================================
 # Recommender Engine
@@ -126,37 +120,39 @@ def load_npz_as_npy_safe(path: Path) -> np.ndarray:
 class RecommenderEngine:
 
     def __init__(self):
-        logger.info("🚀 Initializing Recommender Engine")
+
+        logger.info("🚀 Initializing Engine")
 
         self._load_data()
         self._load_models()
-        self._build_als_engine()
-        self._build_content_engine()
-        self._build_hybrid_engine()
+        self._build_engines()
 
-        logger.info("✅ Recommender Engine Ready")
+        logger.info("✅ Engine Ready")
 
     # --------------------------------------
-    # Load Display Data
+    # Data
     # --------------------------------------
     def _load_data(self):
+
         movies_path = download_if_needed("clean_movies.parquet")
+
         self.movies = safe_read_parquet(movies_path)
 
     # --------------------------------------
-    # Load Models
+    # Models
     # --------------------------------------
     def _load_models(self):
-
-        logger.info("🔄 Loading models")
 
         BASE_DIR = Path(__file__).resolve().parents[1]
         MODELS_DIR = BASE_DIR / "models"
 
-        def load_pickle(name: str):
+        def load_pickle(name):
+
             path = MODELS_DIR / name
+
             if not path.exists():
-                raise FileNotFoundError(f"❌ Missing model file: {name}")
+                raise FileNotFoundError(name)
+
             with open(path, "rb") as f:
                 return pickle.load(f)
 
@@ -173,60 +169,47 @@ class RecommenderEngine:
         self.faiss_index = faiss.read_index(str(faiss_path))
 
         features_path = download_if_needed("item_features.npy")
-        self.item_features = load_npz_as_npy_safe(features_path)
+        self.item_features = load_npz_safe(features_path)
 
         sparse_path = MODELS_DIR / "X_sparse.npz"
+
         if not sparse_path.exists():
-            raise FileNotFoundError("❌ X_sparse.npz not found")
+            raise FileNotFoundError("X_sparse.npz missing")
 
         self.X_sparse = sparse.load_npz(sparse_path)
 
-        logger.info("✅ Models loaded successfully")
+    # --------------------------------------
+    # Engines
+    # --------------------------------------
+    def _build_engines(self):
 
-    # --------------------------------------
-    # ALS Engine
-    # --------------------------------------
-    def _build_als_engine(self):
+        interactions_path = download_if_needed("clean_interactions.parquet")
+        train_df = safe_read_parquet(interactions_path)
+
         self.als_engine = ALSRecommender(
-            model=self.als_model,
-            X=self.X_sparse,
-            user_map=self.user_map,
-            item_map=self.item_map,
-            inv_item_map=self.inv_item_map
+            self.als_model,
+            self.X_sparse,
+            self.user_map,
+            self.item_map,
+            self.inv_item_map
         )
-
-    # --------------------------------------
-    # Content Engine
-    # --------------------------------------
-    def _build_content_engine(self):
-
-        train_path = download_if_needed("clean_interactions.parquet")
-        train_df = safe_read_parquet(train_path)
 
         self.content_engine = ContentSearcher(
-            train_df=train_df,
-            item_features=self.item_features,
-            faiss_index=self.faiss_index,
-            movieId_to_index=self.movieId_to_index,
-            index_to_movieId={v: k for k, v in self.movieId_to_index.items()}
+            train_df,
+            self.item_features,
+            self.faiss_index,
+            self.movieId_to_index,
+            {v: k for k, v in self.movieId_to_index.items()}
         )
-
-    # --------------------------------------
-    # Hybrid Engine
-    # --------------------------------------
-    def _build_hybrid_engine(self):
-
-        train_path = download_if_needed("clean_interactions.parquet")
-        train_df = safe_read_parquet(train_path)
 
         self.hybrid_engine = HybridRecommender(
-            als_recommender=self.als_engine,
-            content_searcher=self.content_engine,
-            train_df=train_df
+            self.als_engine,
+            self.content_engine,
+            train_df
         )
 
     # --------------------------------------
-    # Output Formatter
+    # Formatter
     # --------------------------------------
     def _format_output(self, recs):
 
@@ -248,9 +231,9 @@ class RecommenderEngine:
             self.als_engine.recommend_als(user_id, top_k)
         )
 
-    def recommend_content(self, user_id, top_k=10):
+    def recommend_content(self, movie_id, top_k=10):
         return self._format_output(
-            self.content_engine.recommend(user_id, top_k)
+            self.content_engine.recommend(movie_id, top_k)
         )
 
     def recommend_hybrid(self, user_id, top_k=10, alpha=0.7):
