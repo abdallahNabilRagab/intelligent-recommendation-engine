@@ -1,7 +1,7 @@
 # ==========================================
 # RECSYS_PROJECT/src/inference.py
 # Robust Production Inference Engine
-# Streamlit Cloud & Google Drive Safe
+# Arrow / LargeUtf8 SAFE – Cloud Stable Edition
 # ==========================================
 
 import pickle
@@ -18,7 +18,7 @@ from src.content_based.search import ContentSearcher
 from src.hybrid.hybrid import HybridRecommender
 
 # ==========================================
-# Logging (Streamlit Friendly)
+# Logging
 # ==========================================
 
 logging.basicConfig(
@@ -35,8 +35,7 @@ CACHE_DIR = Path("/tmp/recsys_cache")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # ==========================================
-# Google Drive Files (PUBLIC)
-# item_features is NPZ but kept under old name
+# Google Drive Files
 # ==========================================
 
 GDRIVE_FILES = {
@@ -79,16 +78,41 @@ def download_if_needed(filename: str, force: bool = False) -> Path:
     return path
 
 
+# ==========================================
+# 🔥 Arrow / LargeUtf8 Killer
+# ==========================================
+
+def sanitize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+
+    for col in df.columns:
+        dtype_name = str(df[col].dtype)
+
+        if dtype_name in ["string", "large_string"]:
+            df[col] = df[col].astype("object")
+
+        elif "string" in dtype_name.lower():
+            df[col] = df[col].astype("object")
+
+    return df
+
+
+def safe_read_parquet(path: Path) -> pd.DataFrame:
+    df = pd.read_parquet(path)
+    return sanitize_dataframe(df)
+
+
+# ==========================================
+# NPZ Loader
+# ==========================================
+
 def load_npz_as_npy_safe(path: Path) -> np.ndarray:
-    """
-    Load NPZ safely but return numpy array (as if it were NPY)
-    """
     try:
         with np.load(path) as data:
             if "data" not in data:
                 raise ValueError("Missing 'data' key in NPZ")
             return data["data"]
-    except Exception as e:
+    except Exception:
         logger.warning(f"⚠️ Corrupted NPZ detected: {path.name} → retrying")
         _safe_remove(path)
         path = download_if_needed(path.name, force=True)
@@ -100,18 +124,16 @@ def load_npz_as_npy_safe(path: Path) -> np.ndarray:
 # ==========================================
 
 class RecommenderEngine:
-    """
-    Unified Production Inference Engine
-    (ALS + Content + Hybrid)
-    """
 
     def __init__(self):
         logger.info("🚀 Initializing Recommender Engine")
+
         self._load_data()
         self._load_models()
         self._build_als_engine()
         self._build_content_engine()
         self._build_hybrid_engine()
+
         logger.info("✅ Recommender Engine Ready")
 
     # --------------------------------------
@@ -119,12 +141,13 @@ class RecommenderEngine:
     # --------------------------------------
     def _load_data(self):
         movies_path = download_if_needed("clean_movies.parquet")
-        self.movies = pd.read_parquet(movies_path)
+        self.movies = safe_read_parquet(movies_path)
 
     # --------------------------------------
     # Load Models
     # --------------------------------------
     def _load_models(self):
+
         logger.info("🔄 Loading models")
 
         BASE_DIR = Path(__file__).resolve().parents[1]
@@ -137,7 +160,6 @@ class RecommenderEngine:
             with open(path, "rb") as f:
                 return pickle.load(f)
 
-        # Core models
         self.als_model = load_pickle("als_model.pkl")
         self.tfidf = load_pickle("tfidf.pkl")
         self.mlb = load_pickle("mlb.pkl")
@@ -147,18 +169,16 @@ class RecommenderEngine:
 
         self.inv_item_map = {v: k for k, v in self.item_map.items()}
 
-        # FAISS
         faiss_path = download_if_needed("faiss.index")
         self.faiss_index = faiss.read_index(str(faiss_path))
 
-        # Item Features (NPZ → ndarray)
         features_path = download_if_needed("item_features.npy")
         self.item_features = load_npz_as_npy_safe(features_path)
 
-        # Sparse Matrix
         sparse_path = MODELS_DIR / "X_sparse.npz"
         if not sparse_path.exists():
             raise FileNotFoundError("❌ X_sparse.npz not found")
+
         self.X_sparse = sparse.load_npz(sparse_path)
 
         logger.info("✅ Models loaded successfully")
@@ -179,8 +199,9 @@ class RecommenderEngine:
     # Content Engine
     # --------------------------------------
     def _build_content_engine(self):
+
         train_path = download_if_needed("clean_interactions.parquet")
-        train_df = pd.read_parquet(train_path)
+        train_df = safe_read_parquet(train_path)
 
         self.content_engine = ContentSearcher(
             train_df=train_df,
@@ -194,8 +215,9 @@ class RecommenderEngine:
     # Hybrid Engine
     # --------------------------------------
     def _build_hybrid_engine(self):
+
         train_path = download_if_needed("clean_interactions.parquet")
-        train_df = pd.read_parquet(train_path)
+        train_df = safe_read_parquet(train_path)
 
         self.hybrid_engine = HybridRecommender(
             als_recommender=self.als_engine,
@@ -204,16 +226,23 @@ class RecommenderEngine:
         )
 
     # --------------------------------------
-    # Recommendations API
+    # Output Formatter
     # --------------------------------------
     def _format_output(self, recs):
+
         if recs is None or len(recs) == 0:
             return pd.DataFrame()
-        return (
+
+        df = (
             pd.DataFrame(recs, columns=["movieId", "score"])
             .merge(self.movies, on="movieId", how="left")
         )
 
+        return sanitize_dataframe(df)
+
+    # --------------------------------------
+    # APIs
+    # --------------------------------------
     def recommend_als(self, user_id, top_k=10):
         return self._format_output(
             self.als_engine.recommend_als(user_id, top_k)
