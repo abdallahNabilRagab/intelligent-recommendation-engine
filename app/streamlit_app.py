@@ -10,11 +10,6 @@ import sys
 from pathlib import Path
 
 # ==========================================
-# 🔥 Disable Arrow Serialization (ROOT FIX)
-# ==========================================
-st.set_option("dataFrameSerialization", "legacy")
-
-# ==========================================
 # Page Configuration
 # ==========================================
 st.set_page_config(
@@ -68,7 +63,8 @@ def render_table(df: pd.DataFrame):
     if df is None or df.empty:
         st.warning("⚠️ No results found.")
         return
-    st.dataframe(df.reset_index(drop=True), use_container_width=True)
+    df = pd.DataFrame(df).reset_index(drop=True)
+    st.dataframe(df, use_container_width=True)
 
 # ==========================================
 # UI Header
