@@ -1,41 +1,42 @@
 # ================================
 # Core Data Handling
 # ================================
-pandas
-numpy
-scipy
+pandas==2.1.4
+numpy==1.26.4
+scipy==1.11.4
+pyarrow==12.0.1
 
 # ================================
 # Machine Learning / Feature Engineering
 # ================================
-scikit-learn
-implicit
-joblib
+scikit-learn==1.3.2
+implicit==0.7.2
+joblib==1.3.2
 
 # ================================
 # Recommender Systems / ANN Search
 # ================================
-faiss-cpu
+faiss-cpu==1.7.4
 
 # ================================
 # Utilities
 # ================================
-tqdm
-gdown
+tqdm==4.66.1
+gdown==4.7.1
 
 # ================================
 # Visualization
 # ================================
-matplotlib
-seaborn
+matplotlib==3.8.2
+seaborn==0.13.1
 altair==4.2.0
 
 # ================================
 # Web / UI
 # ================================
-streamlit
+streamlit==1.32.0
 
 # ================================
-# Text Processing (Content-Based)
+# Text Processing
 # ================================
-nltk
+nltk==3.8.1
