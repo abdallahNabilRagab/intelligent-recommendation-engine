@@ -189,17 +189,27 @@ class RecommenderEngine:
             train_df=train_df
         )
 
-    # --------------------------------------
-    # Output Formatter
-    # --------------------------------------
     def _format_output(self, recs):
         if recs is None or len(recs) == 0:
             return pd.DataFrame()
-        df_recs = pd.DataFrame(recs, columns=["movieId", "score"])
-        df_recs["movieId"] = df_recs["movieId"].astype(str)
+        
+        # اجعل movieId من كلا الجدولين str
+        recs_df = pd.DataFrame(recs, columns=["movieId", "score"])
+        recs_df["movieId"] = recs_df["movieId"].astype(str)
         self.movies["movieId"] = self.movies["movieId"].astype(str)
-        df = df_recs.merge(self.movies, on="movieId", how="left")
-        return sanitize_dataframe(df)
+        
+        df = recs_df.merge(self.movies, on="movieId", how="left")
+        
+        # اجعل كل الأعمدة str لضمان عدم ظهور LargeUtf8
+        for col in df.columns:
+            df[col] = df[col].astype(str)
+        
+        # إعادة القراءة من CSV في الذاكرة قبل العرض
+        buffer = io.StringIO()
+        df.to_csv(buffer, index=False)
+        buffer.seek(0)
+        return pd.read_csv(buffer)
+
 
     # --------------------------------------
     # APIs
@@ -212,3 +222,4 @@ class RecommenderEngine:
 
     def recommend_hybrid(self, user_id, top_k=10, alpha=0.7):
         return self._format_output(self.hybrid_engine.recommend_weighted(user_id, top_k, alpha))
+
