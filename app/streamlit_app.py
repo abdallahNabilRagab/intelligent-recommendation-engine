@@ -1,10 +1,11 @@
 # ==========================================
 # RECSYS_PROJECT/app/streamlit_app.py
 # Cloud-Safe Production Streamlit Interface
-# Arrow / LargeUtf8 FINAL & GUARANTEED FIX
+# FINAL FIX: HTML Table + CSS (Streamlit Cloud Safe)
 # ==========================================
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import sys
 from pathlib import Path
@@ -57,8 +58,8 @@ movies["movieId"] = movies["movieId"].astype(str)
 movies["title"] = movies["title"].astype(str)
 
 # ==========================================
-# 🚨 FINAL BULLETPROOF TABLE RENDERER
-# (NO Arrow – NO LargeUtf8 – Cloud Safe)
+# ✅ FINAL CLOUD-SAFE HTML TABLE RENDERER
+# (NO Arrow – NO LargeUtf8 – FULL CSS SUPPORT)
 # ==========================================
 def render_table_html(df: pd.DataFrame):
     if df is None or df.empty:
@@ -67,51 +68,57 @@ def render_table_html(df: pd.DataFrame):
 
     df = df.copy().reset_index(drop=True)
 
-    # Force string + truncate hard
+    # Force string + hard truncate
     df = df.astype(str)
     for col in df.columns:
         df[col] = df[col].str.slice(0, 300)
 
-    html = df.to_html(
+    table_html = df.to_html(
         index=False,
         escape=True,
-        border=0,
-        justify="left"
+        border=0
     )
 
-    st.markdown(
-        f"""
+    html = f"""
+    <html>
+    <head>
         <style>
-        table.recsys-table {{
-            width: 100%;
-            border-collapse: collapse;
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-        }}
-        table.recsys-table thead th {{
-            background-color: #0e1117;
-            color: white;
-            padding: 10px;
-            border-bottom: 2px solid #444;
-            text-align: left;
-        }}
-        table.recsys-table tbody td {{
-            padding: 8px;
-            border-bottom: 1px solid #333;
-            vertical-align: top;
-            white-space: normal;
-            word-break: break-word;
-            max-width: 420px;
-        }}
-        table.recsys-table tbody tr:hover {{
-            background-color: #1f2937;
-        }}
+            body {{
+                background-color: transparent;
+                font-family: Arial, sans-serif;
+            }}
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 14px;
+            }}
+            thead th {{
+                background-color: #0e1117;
+                color: #ffffff;
+                padding: 10px;
+                text-align: left;
+                border-bottom: 2px solid #444;
+            }}
+            tbody td {{
+                padding: 8px;
+                border-bottom: 1px solid #333;
+                vertical-align: top;
+                white-space: normal;
+                word-break: break-word;
+                max-width: 420px;
+            }}
+            tbody tr:hover {{
+                background-color: #1f2937;
+            }}
         </style>
+    </head>
+    <body>
+        {table_html}
+    </body>
+    </html>
+    """
 
-        {html.replace('<table', '<table class="recsys-table"')}
-        """,
-        unsafe_allow_html=True
-    )
+    components.html(html, height=600, scrolling=True)
 
 # ==========================================
 # UI Header
