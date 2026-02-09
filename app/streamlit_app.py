@@ -56,7 +56,7 @@ movies = engine.movies.copy()
 movies["title"] = movies["title"].astype(str)
 
 # ==========================================
-# FINAL Arrow/LargeUtf8 SAFE DataFrame Utility
+# Arrow/LargeUtf8 SAFE DataFrame Utility
 # ==========================================
 def safe_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """
