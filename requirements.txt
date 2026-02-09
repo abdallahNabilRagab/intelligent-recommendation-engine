@@ -4,7 +4,6 @@
 pandas
 numpy
 scipy
-pyarrow==14.0.2
 
 # =================================
 # Machine Learning / Feature Engineering
@@ -40,3 +39,4 @@ streamlit
 # Text Processing (Content-Based)
 # =================================
 nltk
+
