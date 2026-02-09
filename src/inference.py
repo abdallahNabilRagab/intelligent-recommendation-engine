@@ -111,8 +111,9 @@ class RecommenderEngine:
     # --------------------------------------
     def _load_data(self):
         movies_path = download_if_needed("clean_movies.parquet")
-        # 🔥 Convert all columns to str immediately
         self.movies = sanitize_dataframe(pd.read_parquet(movies_path))
+        # Ensure movieId is string for safe merge
+        self.movies["movieId"] = self.movies["movieId"].astype(str)
 
     # --------------------------------------
     # Load Models
@@ -194,8 +195,10 @@ class RecommenderEngine:
     def _format_output(self, recs):
         if recs is None or len(recs) == 0:
             return pd.DataFrame()
-        df = pd.DataFrame(recs, columns=["movieId", "score"]) \
-               .merge(self.movies, on="movieId", how="left")
+        df_recs = pd.DataFrame(recs, columns=["movieId", "score"])
+        df_recs["movieId"] = df_recs["movieId"].astype(str)
+        self.movies["movieId"] = self.movies["movieId"].astype(str)
+        df = df_recs.merge(self.movies, on="movieId", how="left")
         return sanitize_dataframe(df)
 
     # --------------------------------------
