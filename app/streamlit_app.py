@@ -1,7 +1,7 @@
 # ==========================================
 # RECSYS_PROJECT/app/streamlit_app.py
 # Cloud-Safe Production Streamlit Interface
-# Arrow / LargeUtf8 FINAL FIX
+# Arrow / LargeUtf8 FINAL & CORRECT FIX
 # ==========================================
 
 import streamlit as st
@@ -11,11 +11,14 @@ from pathlib import Path
 
 
 # ==========================================
-# 🔒 CRITICAL FIX: Disable Arrow Globally
+# Page Configuration (MUST be first)
 # ==========================================
 
-st.set_option("dataframe.arrowEnabled", False)
-st.set_option("dataframe.use_container_width", True)
+st.set_page_config(
+    page_title="Hybrid Movie Recommender",
+    page_icon="🎬",
+    layout="wide",
+)
 
 
 # ==========================================
@@ -37,17 +40,6 @@ except Exception as e:
     st.error("❌ Failed to load Recommender Engine.")
     st.exception(e)
     st.stop()
-
-
-# ==========================================
-# Page Configuration
-# ==========================================
-
-st.set_page_config(
-    page_title="Hybrid Movie Recommender",
-    page_icon="🎬",
-    layout="wide",
-)
 
 
 # ==========================================
@@ -75,14 +67,14 @@ movies["title"] = movies["title"].astype(str)
 
 
 # ==========================================
-# Utility: FINAL Arrow-Safe DataFrame
+# FINAL Arrow-Safe DataFrame Utility
 # ==========================================
 
 def arrow_safe_df(df: pd.DataFrame) -> pd.DataFrame:
     """
     FINAL & GUARANTEED FIX:
-    - Disable Arrow issues (LargeUtf8)
-    - Force Pandas rendering
+    - Avoid Arrow / LargeUtf8 issues
+    - Force safe Pandas rendering
     """
     if df is None or df.empty:
         return pd.DataFrame()
