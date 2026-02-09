@@ -12,7 +12,6 @@ import pandas as pd
 from scipy import sparse
 from pathlib import Path
 import logging
-import os
 
 from src.als.recommend import ALSRecommender
 from src.content_based.search import ContentSearcher
@@ -37,11 +36,12 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # ==========================================
 # Google Drive Files (PUBLIC)
+# item_features is NPZ but kept under old name
 # ==========================================
 
 GDRIVE_FILES = {
     "faiss.index": "https://drive.google.com/uc?id=1Ls_O-Mk4HcVD8rwK-eETDpOCCUFTsb3A",
-    "item_features.npy": "https://drive.google.com/uc?id=1IzwqjBdVytPmuBgPPFIYdMH2JUfbaq7w",
+    "item_features.npy": "https://drive.google.com/uc?id=1tWBmtp0SoO7t0ef_Wei55-ekvbv-DeAA",
     "clean_interactions.parquet": "https://drive.google.com/uc?id=1THrU5p0QebN5eTnLwV3iR8s8b77vdhdu",
     "clean_movies.parquet": "https://drive.google.com/uc?id=1m_IZTPLvf7AKvS3tay6jj1ZKZKRdJyT6",
 }
@@ -59,9 +59,6 @@ def _safe_remove(path: Path):
 
 
 def download_if_needed(filename: str, force: bool = False) -> Path:
-    """
-    Download file from Google Drive with integrity safety.
-    """
     path = CACHE_DIR / filename
 
     if force:
@@ -77,22 +74,26 @@ def download_if_needed(filename: str, force: bool = False) -> Path:
         )
 
     if not path.exists() or path.stat().st_size < 1024:
-        raise RuntimeError(f"❌ Failed to download valid file: {filename}")
+        raise RuntimeError(f"❌ Invalid or empty file: {filename}")
 
     return path
 
 
-def load_npy_safe(path: Path) -> np.ndarray:
+def load_npz_as_npy_safe(path: Path) -> np.ndarray:
     """
-    Safely load NPY with auto-retry if corrupted.
+    Load NPZ safely but return numpy array (as if it were NPY)
     """
     try:
-        return np.load(path, allow_pickle=False)
+        with np.load(path) as data:
+            if "data" not in data:
+                raise ValueError("Missing 'data' key in NPZ")
+            return data["data"]
     except Exception as e:
-        logger.warning(f"⚠️ Corrupted NPY detected: {path.name} → retrying")
+        logger.warning(f"⚠️ Corrupted NPZ detected: {path.name} → retrying")
         _safe_remove(path)
         path = download_if_needed(path.name, force=True)
-        return np.load(path, allow_pickle=False)
+        with np.load(path) as data:
+            return data["data"]
 
 # ==========================================
 # Recommender Engine
@@ -129,13 +130,14 @@ class RecommenderEngine:
         BASE_DIR = Path(__file__).resolve().parents[1]
         MODELS_DIR = BASE_DIR / "models"
 
-        def load_pickle(name):
+        def load_pickle(name: str):
             path = MODELS_DIR / name
             if not path.exists():
                 raise FileNotFoundError(f"❌ Missing model file: {name}")
             with open(path, "rb") as f:
                 return pickle.load(f)
 
+        # Core models
         self.als_model = load_pickle("als_model.pkl")
         self.tfidf = load_pickle("tfidf.pkl")
         self.mlb = load_pickle("mlb.pkl")
@@ -149,9 +151,9 @@ class RecommenderEngine:
         faiss_path = download_if_needed("faiss.index")
         self.faiss_index = faiss.read_index(str(faiss_path))
 
-        # Item Features (SAFE)
+        # Item Features (NPZ → ndarray)
         features_path = download_if_needed("item_features.npy")
-        self.item_features = load_npy_safe(features_path)
+        self.item_features = load_npz_as_npy_safe(features_path)
 
         # Sparse Matrix
         sparse_path = MODELS_DIR / "X_sparse.npz"
